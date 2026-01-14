@@ -23,16 +23,10 @@ def compute_chlorophyll_growth_rate(phy_pisl, phy_pisl2, phy_mumax, phy_limnut, 
 
     # Non-zero tracers
     phy_loc = np.fmax(0.0, phy_loc[:,1])
-
-    ### calculate day_length factors from 0 to 1 
-    #solar_dec = 23.45 * np.sin((2*np.pi/365) * (day_of_year - 81))
-    #solar_hour_angle = np.arccos(-np.tan(np.deg2rad(lat)) *    np.tan(np.deg2rad(solar_dec)))       
-    #day_length = np.fmax(0.0, np.fmin(1.0, solar_hour_angle/np.pi))
     
     # Calculate PI slope adjusted for maximum growth rate and nutrient limitation
     #   - increase slope if nutrient rich
     #   - decrease slope if growing fast (temperature is high)
-    #chl_pisl = phy_pisl / (phy_mumax / d2s * (1.0 - phy_limnut))
     conserved_limnut = np.maximum(1.0 - phy_limnut, 0.2)
     chl_pisl = phy_pisl / (phy_mumax / d2s * conserved_limnut)
 
