@@ -1,0 +1,61 @@
+def compute_chlorophyll_growth_rate(phy_pisl, phy_pisl2, phy_mumax, phy_limnut, par_tot_mld, phy_mu, phy_loc, lat, day_of_year, BGC):
+    """
+    Calculate the growth rate of chlorophyll, considering light and nutrient availability.
+
+    Inputs:
+        - phy_pisl (np.ndarray): Photosynthesis-irradiance (PI) slope (µmolC/µmol photons).
+        - phy_mumax (float or np.ndarray): Maximum phytoplankton growth rate (s⁻¹).
+        - phy_limnut (np.ndarray): Nutrient limitation factor for phytoplankton growth (0-1).
+        - par_phy_mld (np.ndarray): PAR within the mixed layer (µmol photons/m²/s).
+        - phy_mu (np.ndarray): Realized phytoplankton growth rate (s⁻¹).
+        - phy_loc (np.ndarray): Phytoplankton concentration (µmolC/L).
+        - day_of_year: day of the year
+        - lat： Latitude
+        
+    Returns:
+        dict: A dictionary containing the following keys:
+            - `chl_mu` (np.ndarray): Growth rate of chlorophyll (µmolChl/L/day).
+            - `chl_limpar` (np.ndarray): Light limitation factor specific to chlorophyll.
+    """
+    
+    # Constants
+    d2s = 1.0 / 86400.0
+
+    # Non-zero tracers
+    phy_loc = np.fmax(0.0, phy_loc[:,1])
+
+    ### calculate day_length factors from 0 to 1 
+    #solar_dec = 23.45 * np.sin((2*np.pi/365) * (day_of_year - 81))
+    #solar_hour_angle = np.arccos(-np.tan(np.deg2rad(lat)) *    np.tan(np.deg2rad(solar_dec)))       
+    #day_length = np.fmax(0.0, np.fmin(1.0, solar_hour_angle/np.pi))
+    
+    # Calculate PI slope adjusted for maximum growth rate and nutrient limitation
+    #   - increase slope if nutrient rich
+    #   - decrease slope if growing fast (temperature is high)
+    #chl_pisl = phy_pisl / (phy_mumax / d2s * (1.0 - phy_limnut))
+    conserved_limnut = np.maximum(1.0 - phy_limnut, 0.2)
+    chl_pisl = phy_pisl / (phy_mumax / d2s * conserved_limnut)
+
+
+    # Light limitation factor specific to chlorophyll and average light availabe in mixed layer
+    chl_limpar = (1.0 - np.exp(-chl_pisl * par_tot_mld))
+
+    # Minimum and optimal growth rates in chlorophyll
+    chl_mumin = BGC.phy_minchlc * phy_mu * phy_loc * 12.0
+    chl_muopt = BGC.phy_optchlc * phy_mu * phy_loc * 12.0
+
+    # Realized chlorophyll growth rate
+    chl_mu = (chl_muopt - chl_mumin) * chl_limpar * phy_limnut
+
+    # Adjust (increase) chlorophyll growth rate based on (low) light availability to phytoplankton
+    for kk in range(len(phy_loc) - 1):
+        if (phy_pisl[kk] * par_tot_mld[kk]) > 0.0:
+            chl_mu[kk] = chl_mumin[kk] + chl_mu[kk] 
+            #chl_mu[kk] = chl_mumin[kk] + chl_mu[kk] / (phy_pisl[kk] * par_tot_mld[kk])
+
+    return {
+        "chl_mu": chl_mu,
+        "chl_limpar": chl_limpar,
+        "chl_pisl": chl_pisl,
+    }
+
